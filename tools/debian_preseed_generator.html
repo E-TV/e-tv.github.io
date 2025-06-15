@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Debian Preseed Generator</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            max-width: 800px;
+            margin: auto;
+        }
+
+        label {
+            display: block;
+            margin-top: 1rem;
+        }
+
+        select,
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 0.5rem;
+            margin-top: 0.3rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 400px;
+            margin-top: 2rem;
+            font-family: monospace;
+        }
+
+        button {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            font-size: 1rem;
+        }
+
+        .password-wrapper {
+            display: flex;
+            gap: 0.5em;
+            align-items: center;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🚀 Debian Preseed Generator</h1>
+
+    <label>
+        Sprache/Locale:
+        <select id="locale">
+            <option value="de_DE.UTF-8">Deutsch (de_DE)</option>
+            <option value="en_US.UTF-8">Englisch (en_US)</option>
+        </select>
+    </label>
+
+    <label>
+        Benutzername:
+        <input type="text" id="username" value="bastian">
+    </label>
+
+    <label>
+        Benutzer-Passwort:
+        <div class="password-wrapper">
+            <input type="password" id="password" value="12345678">
+            <button type="button" onclick="togglePassword('password')">👁️</button>
+        </div>
+    </label>
+
+    <label>
+        Root-Passwort:
+        <div class="password-wrapper">
+            <input type="password" id="rootpassword" value="12345678">
+            <button type="button" onclick="togglePassword('rootpassword')">👁️</button>
+        </div>
+    </label>
+
+    <label>
+        Hostname:
+        <input type="text" id="hostname" value="debian-desktop">
+    </label>
+
+    <label>
+        Desktop-Umgebung:
+        <select id="desktop">
+            <option value="gnome-desktop">GNOME</option>
+            <option value="kde-desktop" selected>KDE</option>
+            <option value="xfce-desktop">XFCE</option>
+            <option value="lxde-desktop">LXDE</option>
+            <option value="mate-desktop">MATE</option>
+        </select>
+    </label>
+
+    <label for="browser">Browser</label>
+    <select id="browser" name="browser">
+        <option value="firefox">Firefox</option>
+        <!--<option value="chromium">Chromium</option>-->
+        <option value="brave" selected>Brave</option>
+        <option value="none">Kein Browser</option>
+    </select>
+
+    <label>
+        SSH-Server installieren?
+        <input type="checkbox" id="ssh">
+    </label>
+
+    <label>
+        Zeitzone:
+        <input type="text" id="timezone" value="Europe/Berlin">
+    </label>
+
+    <button onclick="generatePreseed()">⚙️ Konfiguration generieren</button>
+    <button onclick="downloadPreseed()">⬇️ Download preseed.cfg</button>
+
+    <textarea id="output" placeholder="Hier erscheint deine fertige preseed.cfg..."></textarea>
+
+    <script>
+        function generatePreseed() {
+            const locale = document.getElementById("locale").value;
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            const rootpassword = document.getElementById("rootpassword").value;
+            const hostname = document.getElementById("hostname").value;
+            const desktop = document.getElementById("desktop").value;
+            const installSSH = document.getElementById("ssh").checked;
+            const timezone = document.getElementById("timezone").value;
+            const browser = document.getElementById('browser').value;
+
+
+            const tasks = ["desktop", desktop];
+            if (installSSH) tasks.push("ssh-server");
+
+            if (!password) {
+                alert("⚠️ Bitte ein Passwort eingeben oder generieren lassen!");
+                return;
+            }
+
+            function togglePassword() {
+                const pw = document.getElementById('password');
+                pw.type = pw.type === 'password' ? 'text' : 'password';
+            }
+
+            let browserstring = '';
+
+            if (browser === 'firefox') {
+                browserstring += `firefox-esr`;
+            } else if (browser === 'chromium') {
+                browserstring += `chromium`
+                browserstring += `\ntasksel tasksel/first multiselect standard\n`;
+                browserstring += `d-i preseed/late_command string apt-get -y purge firefox-esr || true\n`;
+            } else if (browser === 'brave') {
+                browserstring += `\ntasksel tasksel/first multiselect standard\n`;
+                browserstring += `d-i preseed/late_command string apt-get -y purge firefox-esr || true\n`;
+                browserstring += `d - i preseed / late_command string in -target curl - fsSLo / usr / share / keyrings / brave - browser - archive - keyring.gpg https://brave.com/static-assets/repo/brave-browser-archive-keyring.gpg ; \
+echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave.com/apt stable main" > /target/etc / apt / sources.list.d / brave - browser - release.list; \
+in -target apt - get update; \
+in -target apt - get install - y brave - browser; \
+in -target apt - get purge - y firefox - esr || true`
+            } else if (browser === 'none') {
+                browserstring += `\ntasksel tasksel/first multiselect standard\n`;
+                browserstring += `d-i preseed/late_command string apt-get -y purge firefox-esr || true\n`;
+            }
+
+            const preseed = `
+                d-i debian-installer/locale string ${locale}
+d-i console-setup/ask_detect boolean false
+d-i keyboard-configuration/layoutcode string de
+
+d-i netcfg/disable_autoconfig boolean false
+d-i netcfg/get_hostname string ${hostname}
+d-i netcfg/get_domain string local
+
+d-i mirror/country string manual
+d-i mirror/http/hostname string deb.debian.org
+d-i mirror/http/directory string /debian
+d-i mirror/http/proxy string
+
+d-i passwd/user-fullname string ${username}
+d-i passwd/username string ${username}
+d-i passwd/user-password password ${password}
+d-i passwd/user-password-again password ${password}
+d-i passwd/root-password password ${rootpassword}
+d-i passwd/root-password-again password ${rootpassword}
+
+d-i passwd/user-default-groups string sudo
+
+${browserstring}
+
+d-i clock-setup/utc boolean true
+d-i time/zone string ${timezone}
+d-i clock-setup/ntp boolean true
+
+tasksel tasksel/first multiselect ${tasks.join(", ")}
+
+popularity-contest popularity-contest/participate boolean false
+
+d-i grub-installer/only_debian boolean true
+d-i finish-install/reboot_in_progress note
+            `.trim();
+
+            document.getElementById("output").value = preseed;
+        }
+
+        function downloadPreseed() {
+            generatePreseed();
+            const text = document.getElementById('output').value;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'preseed.cfg';
+            a.click();
+        }
+
+
+
+    </script>
+</body>
+
+</html>
