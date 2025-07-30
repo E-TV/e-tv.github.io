@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Arbeitstag Fortschritt</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .progress-container {
+            width: 80%;
+            background-color: #ddd;
+            border-radius: 20px;
+            margin: 20px auto;
+            height: 30px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            /*background: linear-gradient(to right, red, green);*/
+            background-color: rgb(255, 0, 0);
+            /* Initialfarbe Rot */
+            transition: width 1s;
+        }
+
+        .time-inputs {
+            margin: 20px;
+        }
+
+        .reminder {
+            font-size: 1.2em;
+            color: #333;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Arbeitstag Fortschrittsanzeige</h1>
+    <div class="time-inputs">
+        <label for="startTime">Startzeit:</label>
+        <input type="time" id="startTime" value="07:05">
+        <label for="endTime">Endzeit:</label>
+        <input type="time" id="endTime" value="15:15">
+        <button onclick="updateProgress()">Aktualisieren</button>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="reminder" id="progressText"></div>
+    <!--<div class="reminder" id="reminderText">Trinkpause alle 30/45 Minuten nicht vergessen!</div>-->
+    <div id="countdown">Verbleibende Minuten: --</div>
+
+    <script>
+        let reminderInterval = null;
+
+        function getProgressColor(progress) {
+            const hue = (progress / 100) * 120; // 0° = Rot, 120° = Grün
+            return `hsl(${hue}, 100%, 50%)`;
+        }
+
+
+        function updateProgress() {
+            const startTime = document.getElementById("startTime").value;
+            const endTime = document.getElementById("endTime").value;
+            const start = new Date();
+            const end = new Date();
+            const now = new Date();
+
+            const [startHour, startMinute] = startTime.split(":").map(Number);
+            const [endHour, endMinute] = endTime.split(":").map(Number);
+
+            start.setHours(startHour, startMinute, 0, 0);
+            end.setHours(endHour, endMinute, 0, 0);
+
+            const total = end - start;
+            const elapsed = now - start;
+            const progress = Math.min(Math.max(elapsed / total, 0), 1) * 100;
+
+            document.getElementById("progressBar").style.width = progress + "%";
+            document.getElementById("progressText").textContent = progress.toFixed(0) + "%";
+
+            const color = getProgressColor(progress);
+            document.getElementById("progressBar").style.backgroundColor = color;
+
+        }
+
+        function setReminders() {
+            if (reminderInterval) clearInterval(reminderInterval);
+
+            const now = new Date();
+            const minutes = now.getMinutes();
+            const nextHalfHour = new Date(now);
+            nextHalfHour.setMinutes(minutes < 30 ? 30 : 60, 0, 0); // nächste volle halbe Stunde
+
+            const delay = nextHalfHour - now;
+
+            setTimeout(() => {
+                triggerReminder(); // Erste Erinnerung
+                reminderInterval = setInterval(triggerReminder, 30 * 60 * 1000); // Danach alle 30 Min
+            }, delay);
+        }
+
+        function triggerReminder() {
+            const now = new Date();
+            const startTime = document.getElementById("startTime").value;
+            const endTime = document.getElementById("endTime").value;
+
+            const [startHour, startMinute] = startTime.split(":").map(Number);
+            const [endHour, endMinute] = endTime.split(":").map(Number);
+
+            const start = new Date();
+            const end = new Date();
+            start.setHours(startHour, startMinute, 0, 0);
+            end.setHours(endHour, endMinute, 0, 0);
+
+            if (now >= start && now <= end) {
+                alert("💧 Zeit für eine Trinkpause!");
+            }
+        }
+
+        function updateCountdown() {
+            const now = new Date();
+            const startInput = document.getElementById("startTime").value;
+            const endInput = document.getElementById("endTime").value;
+
+            const [startHour, startMinute] = startInput.split(":").map(Number);
+            const [endHour, endMinute] = endInput.split(":").map(Number);
+
+            const startTime = new Date();
+            startTime.setHours(startHour, startMinute, 0, 0);
+
+            const endTime = new Date();
+            endTime.setHours(endHour, endMinute, 0, 0);
+
+            const countdownEl = document.getElementById("countdown");
+
+            if (now >= startTime && now <= endTime) {
+                const remainingMs = endTime - now;
+                const remainingMin = Math.floor(remainingMs / 60000);
+                countdownEl.textContent = "Verbleibende Minuten: " + remainingMin;
+                countdownEl.style.display = "block";
+            } else {
+                countdownEl.style.display = "none";
+            }
+        }
+
+
+        updateProgress();
+        setReminders();
+        updateCountdown();
+
+        setInterval(updateCountdown, 60 * 1000); // Aktualisiere jede Minute
+        setInterval(updateProgress, 60 * 1000); // Aktualisiere jede Minute
+
+    </script>
+</body>
+
+</html>
